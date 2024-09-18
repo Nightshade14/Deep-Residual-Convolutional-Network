@@ -1,23 +1,29 @@
 # Importing the Libraries
+from torchvision import transforms, datasets
+from torch.utils.data import DataLoader
+import torch.optim as optim
+import pickle
 import numpy as np
 import torch
 from torch import nn
-import torchvision
-from torchvision.transforms import v2
+
 
 def unpickle(file):
     import pickle
-    with open(file, 'rb') as fo:
-        dict = pickle.load(fo, encoding='bytes')
+
+    with open(file, "rb") as fo:
+        dict = pickle.load(fo, encoding="bytes")
     return dict
 
-def get_label_names_from_bytes_dict(x:dict) -> list:
+
+def get_label_names_from_bytes_dict(x: dict) -> list:
     data = x.get(b"label_names")
-    labels =  list(map(lambda m: m.decode("utf-8"),data))
+    labels = list(map(lambda m: m.decode("utf-8"), data))
     label_dict = dict()
     for i in range(10):
         label_dict.update({labels[i]: i})
     return label_dict
+
 
 def is_my_model_under_5m_params(model):
     FIVE_MILLION = 5_000_000
@@ -41,42 +47,47 @@ IS_LOGGING_ENABLED = True
 torch.manual_seed(0)
 
 
-
 # TRANSFORM THE INPUT DATA
 
-from torchvision import transforms, datasets
-from torch.utils.data import DataLoader
-
 # Composing multiple transformations to apply on the image when creating the dataset
-transform_train = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomCrop(32, padding=4),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
+transform_train = transforms.Compose(
+    [
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ]
+)
 
 # The validation images would only be normalized as we want to infer on it
-transform_val = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
+transform_val = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ]
+)
 
 # loading the data
 
-trainset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+trainset = datasets.CIFAR10(
+    root="./data", train=True, download=True, transform=transform_train
+)
 train_loader = DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
 
-testset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_val)
+testset = datasets.CIFAR10(
+    root="./data", train=False, download=True, transform=transform_val
+)
 val_loader = DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
-
-
 
 
 # DEFINE MODEL
 
+
 def conv3x3(in_channels, out_channels, stride=1):
-    return nn.Conv2d(in_channels, out_channels, kernel_size=3,
-                     stride=stride, padding=1, bias=False)
+    return nn.Conv2d(
+        in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False
+    )
+
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, downsample=None):
@@ -103,6 +114,7 @@ class ResidualBlock(nn.Module):
         out = self.relu(out)
         return out
 
+
 class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=10):
         super(ResNet, self).__init__()
@@ -122,7 +134,8 @@ class ResNet(nn.Module):
         if (stride != 1) or (self.in_channels != out_channels):
             downsample = nn.Sequential(
                 conv3x3(self.in_channels, out_channels, stride=stride),
-                nn.BatchNorm2d(out_channels))
+                nn.BatchNorm2d(out_channels),
+            )
         layers = []
         layers.append(block(self.in_channels, out_channels, stride, downsample))
         self.in_channels = out_channels
@@ -143,16 +156,13 @@ class ResNet(nn.Module):
         out = self.fc(out)
         return out
 
+
 model = ResNet(ResidualBlock, [3, 3, 3, 3])
-
-
 
 
 # MODEL TRAINING LOOP
 
-#Try the Learning Rate Scheduler
-import torch.optim as optim
-from torch.optim.lr_scheduler import StepLR
+# Try the Learning Rate Scheduler
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
@@ -187,28 +197,29 @@ for epoch in range(num_epochs):
 
     scheduler.step()
 
-    print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
-    loss_values.append(running_loss/len(train_loader))
+    print(
+        f"Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}"
+    )
+    loss_values.append(running_loss / len(train_loader))
 
 
 #  EVALUATE MODEL
 
-import pickle
 
 def load_cifar_batch(file):
-    with open(file, 'rb') as fo:
-        batch = pickle.load(fo, encoding='bytes')
+    with open(file, "rb") as fo:
+        batch = pickle.load(fo, encoding="bytes")
     return batch
 
-cifar10_batch = load_cifar_batch('/content/dataset/test/cifar_test_nolabels.pkl')
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+cifar10_batch = load_cifar_batch("/content/dataset/test/cifar_test_nolabels.pkl")
 
-images = cifar10_batch[b'data'].reshape(-1, 3, 32, 32)
-ids = cifar10_batch[b'ids']
+transform_test = transforms.Compose(
+    [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+)
+
+images = cifar10_batch[b"data"].reshape(-1, 3, 32, 32)
+ids = cifar10_batch[b"ids"]
 pred_labels = np.zeros(ids.shape, dtype="int32")
 
 model = model.cuda()
@@ -217,17 +228,13 @@ model.eval()
 for i in range(len(images)):
     with torch.no_grad():
         test_image = images[i]
-        test_image = np.transpose(test_image, (1,2,0))
+        test_image = np.transpose(test_image, (1, 2, 0))
         test_image = transform_test(test_image)
         test_image = test_image.unsqueeze(0).cuda()
 
         pred = model(test_image)
         _, predicted = torch.max(pred, 1)
         pred_labels[i] = predicted
-
-import pandas as pd
-test_results = pd.DataFrame({'ID': ids, 'Labels': pred_labels})
-test_results.to_csv('/content/dataset/result.csv', index=False)
 
 
 torch.save(model.state_dict(), "./model.pth")

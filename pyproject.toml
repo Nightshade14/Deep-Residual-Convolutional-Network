@@ -1,0 +1,13 @@
+[project]
+name = "deep-residual-convolutional-network"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.1.1",
+    "pandas>=2.2.2",
+    "ruff>=0.6.5",
+    "torch>=2.4.1",
+    "torchvision>=0.19.1",
+]
